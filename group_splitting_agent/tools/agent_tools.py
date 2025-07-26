@@ -10,6 +10,8 @@ from group_splitting_agent.tools.groups_manager import (
 # Import utility functions directly to avoid complex type issues
 from group_splitting_agent.tools.utils import round_to_cents
 import json
+from datetime import datetime
+from datetime import datetime
 
 
 def get_group_info(group_name: str, user_id: int) -> str:
@@ -146,6 +148,17 @@ def split_bill_equal(user_id: int, group_name: str, total_amount: float, descrip
                 'percentage': round((share / total_amount) * 100, 2)
             }
         
+        # Persist to database
+        group_id = validation["group_id"]
+        persist_expense_and_shares(
+            group_id=group_id,
+            payer_id=user_id,
+            total_amount=total_amount,
+            description=description,
+            splits=splits,
+            split_type="equal"
+        )
+
         result = {
             "group_name": group_name,
             "split_type": "equal",
@@ -153,11 +166,11 @@ def split_bill_equal(user_id: int, group_name: str, total_amount: float, descrip
             "description": description,
             "split_summary": {}
         }
-        
+
         # Convert to the expected format
-        for user_id, split_data in splits.items():
+        for user_id_split, split_data in splits.items():
             result["split_summary"][split_data["user_name"]] = split_data["share_amount"]
-        
+
         return json.dumps(result)
     except Exception as e:
         return json.dumps({"error": str(e)})
@@ -260,6 +273,17 @@ def split_bill_percentage(user_id: int, group_name: str, total_amount: float,
             first_user = list(user_id_percentage_map.keys())[0]
             splits[first_user]['share_amount'] += difference
         
+        # Persist to database
+        group_id = validation["group_id"]
+        persist_success = persist_expense_and_shares(
+            group_id=group_id,
+            payer_id=user_id,
+            total_amount=total_amount,
+            description=description,
+            splits=splits,
+            split_type="percentage"
+        )
+
         result = {
             "group_name": group_name,
             "split_type": "percentage",
@@ -267,11 +291,11 @@ def split_bill_percentage(user_id: int, group_name: str, total_amount: float,
             "description": description,
             "split_summary": {}
         }
-        
+
         # Convert to the expected format
-        for user_id, split_data in splits.items():
+        for user_id_split, split_data in splits.items():
             result["split_summary"][split_data["user_name"]] = split_data["share_amount"]
-        
+
         return json.dumps(result)
     except Exception as e:
         return json.dumps({"error": str(e)})
@@ -343,6 +367,17 @@ def split_bill_custom_amounts(user_id: int, group_name: str, total_amount: float
                 'percentage': percentage
             }
         
+        # Persist to database
+        group_id = validation["group_id"]
+        persist_expense_and_shares(
+            group_id=group_id,
+            payer_id=user_id,
+            total_amount=total_amount,
+            description=description,
+            splits=splits,
+            split_type="custom_amounts"
+        )
+
         result = {
             "group_name": group_name,
             "split_type": "custom_amounts",
@@ -350,11 +385,11 @@ def split_bill_custom_amounts(user_id: int, group_name: str, total_amount: float
             "description": description,
             "split_summary": {}
         }
-        
+
         # Convert to the expected format
-        for user_id, split_data in splits.items():
+        for user_id_split, split_data in splits.items():
             result["split_summary"][split_data["user_name"]] = split_data["share_amount"]
-        
+
         return json.dumps(result)
     except Exception as e:
         return json.dumps({"error": str(e)})
@@ -498,17 +533,31 @@ def split_bill_itemized(user_id: int, group_name: str, items_data: str,
                 'percentage': percentage
             }
 
+        # Calculate total amount for persistence
+        total_amount = sum(item['price'] for item in items)
+
+        # Persist to database
+        group_id = validation["group_id"]
+        persist_expense_and_shares(
+            group_id=group_id,
+            payer_id=user_id,
+            total_amount=total_amount,
+            description=description,
+            splits=splits,
+            split_type="itemized"
+        )
+
         result = {
             "group_name": group_name,
             "split_type": "itemized",
-            "total_amount": sum(item['price'] for item in items),
+            "total_amount": total_amount,
             "description": description,
             "items": items,
             "split_summary": {}
         }
 
         # Convert to the expected format
-        for user_id, split_data in splits.items():
+        for user_id_split, split_data in splits.items():
             result["split_summary"][split_data["user_name"]] = split_data["share_amount"]
 
         return json.dumps(result)
@@ -589,3 +638,64 @@ def query_database(sql_query: str) -> str:
         return json.dumps({"results": results})
     except Exception as e:
         return json.dumps({"error": str(e)})
+
+
+def persist_expense_and_shares(group_id: int, payer_id: int, total_amount: float,
+                              description: str, splits: dict, split_type: str) -> bool:
+    """
+    Internal tool to persist expense and expense_shares to database
+    Args:
+        group_id: ID of the group
+        payer_id: ID of the user who paid (requesting user)
+        total_amount: Total amount of the expense
+        description: Description of the expense
+        splits: Dictionary mapping user_id to share data
+        split_type: Type of split (equal, percentage, custom_amounts, itemized)
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    import sqlite3
+    import os
+
+    try:
+        # Use a single connection for the entire transaction
+        db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'database', 'mock_finance.db')
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        # Insert into expenses table
+        expense_date = datetime.now().strftime('%Y-%m-%d')
+        expense_type = 'general'  # Default type
+        currency = 'USD'  # Default currency
+
+        expense_insert = f"""
+            INSERT INTO expenses (group_id, payer_id, amount, currency, description, expense_date, type)
+            VALUES ({group_id}, {payer_id}, {total_amount}, '{currency}', '{description}', '{expense_date}', '{expense_type}')
+        """
+        cursor.execute(expense_insert)
+
+        # Get the expense_id of the inserted expense (in same connection)
+        expense_id = cursor.lastrowid
+        print(f"Inserted expense with ID: {expense_id}")
+
+        # Insert into expense_shares table
+        for user_id, split_data in splits.items():
+            share_amount = split_data['share_amount']
+            share_insert = f"""
+                INSERT INTO expense_shares (expense_id, user_id, share_amount)
+                VALUES ({expense_id}, {user_id}, {share_amount})
+            """
+            cursor.execute(share_insert)
+            print(f"Inserted share: expense_id={expense_id}, user_id={user_id}, amount={share_amount}")
+
+        # Commit all changes
+        conn.commit()
+        conn.close()
+
+        return True
+    except Exception as e:
+        print(f"Error persisting expense: {str(e)}")
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
+        return False

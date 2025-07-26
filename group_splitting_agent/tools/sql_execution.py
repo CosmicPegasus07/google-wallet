@@ -18,6 +18,10 @@ def execute_query(sql_query: str):
 
     cursor.execute(sql_query)
 
+    # Commit for INSERT, UPDATE, DELETE operations
+    if sql_query.strip().upper().startswith(('INSERT', 'UPDATE', 'DELETE')):
+        conn.commit()
+
     results = cursor.fetchall()
     conn.close()
 
