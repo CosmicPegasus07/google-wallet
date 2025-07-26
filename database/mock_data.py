@@ -1,10 +1,12 @@
 import sqlite3
 import datetime
 import json
+import os
 
 def populate_mock_data(db_name='mock_finance.db'):
     """Populate database with mock data for testing"""
-    conn = sqlite3.connect(f'database/{db_name}')
+    db_path = os.path.join(os.path.dirname(__file__), db_name)
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # Mock users

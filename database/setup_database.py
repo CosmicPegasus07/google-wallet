@@ -1,11 +1,12 @@
 import sqlite3
-import datetime
-import random
-import uuid
+import os
 
 def setup_database(db_name='mock_finance.db'):
     """Set up the complete database schema"""
-    conn = sqlite3.connect(f'database/{db_name}')
+    db_path = os.path.join(os.path.dirname(__file__), db_name)
+    if os.path.exists(db_path):
+        os.remove(db_path)
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # Create tables (your teammate's schema + enhancements)
