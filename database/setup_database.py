@@ -29,8 +29,17 @@ def setup_database(db_name='mock_finance.db'):
         description TEXT,
         created_by INTEGER NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        group_type TEXT DEFAULT 'custom',
         FOREIGN KEY (created_by) REFERENCES users(user_id)
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS frequent_items (
+        item_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        location TEXT,
+        created_at TIMESTAMP
     )
     """)
 
@@ -57,7 +66,6 @@ def setup_database(db_name='mock_finance.db'):
         expense_date DATE NOT NULL,
         location TEXT,
         type TEXT NOT NULL DEFAULT 'general',
-        split_type TEXT DEFAULT 'equal',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (group_id) REFERENCES groups(group_id),
         FOREIGN KEY (payer_id) REFERENCES users(user_id)
@@ -69,8 +77,6 @@ def setup_database(db_name='mock_finance.db'):
         expense_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
         share_amount REAL NOT NULL,
-        percentage REAL,
-        status TEXT DEFAULT 'pending',
         PRIMARY KEY (expense_id, user_id),
         FOREIGN KEY (expense_id) REFERENCES expenses(expense_id),
         FOREIGN KEY (user_id) REFERENCES users(user_id)
@@ -82,7 +88,6 @@ def setup_database(db_name='mock_finance.db'):
         receipt_id INTEGER PRIMARY KEY AUTOINCREMENT,
         expense_id INTEGER NOT NULL,
         url TEXT NOT NULL,
-        receipt_text TEXT,
         uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (expense_id) REFERENCES expenses(expense_id)
     )
@@ -96,7 +101,6 @@ def setup_database(db_name='mock_finance.db'):
         quantity REAL DEFAULT 1,
         unit_price REAL NOT NULL,
         total_price REAL,
-        assigned_users TEXT,
         FOREIGN KEY (expense_id) REFERENCES expenses(expense_id)
     )
     """)
