@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Dict
-from group_splitting_agent.tools.sql_execution import execute_query
-from group_splitting_agent.tools.utils import round_to_cents
+from sql_execution import execute_query
+from utils import round_to_cents
 
 
 def get_group_members(group_id: int) -> List[Dict]:

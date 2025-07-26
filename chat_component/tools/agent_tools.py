@@ -2,13 +2,10 @@
 Agent-compatible tool wrappers for Google ADK integration
 """
 from typing import Any
-from group_splitting_agent.tools.sql_execution import execute_query
-from group_splitting_agent.tools.groups_manager import (
-    get_group_members, get_user_groups, get_group_details, 
-    get_group_balances
-)
+from chat_component.tools.sql_execution import execute_query
+
 # Import utility functions directly to avoid complex type issues
-from group_splitting_agent.tools.utils import round_to_cents
+from chat_component.tools.utils import round_to_cents
 import json
 from datetime import datetime
 from datetime import datetime
@@ -113,6 +110,7 @@ def split_bill_equal(user_id: int, group_name: str, total_amount: float, descrip
     try:
         # Validate user and group
         validation = validate_user_and_group(user_id, group_name)
+        print(f"-----------------{validation}-------------")
         if "error" in validation:
             return json.dumps(validation)
         
@@ -173,6 +171,7 @@ def split_bill_equal(user_id: int, group_name: str, total_amount: float, descrip
 
         return json.dumps(result)
     except Exception as e:
+        print(f"ERROR: {e}")
         return json.dumps({"error": str(e)})
 
 

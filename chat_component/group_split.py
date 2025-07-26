@@ -1,11 +1,11 @@
 from google.adk.agents import Agent
-from group_splitting_agent.tools.agent_tools import (
+from chat_component.tools.agent_tools import (
     get_group_info, split_bill_equal, split_bill_percentage,
     split_bill_custom_amounts, split_bill_itemized, get_user_groups_info,
     get_group_balance_info, query_database
 )
 
-root_agent = Agent(
+group_agent = Agent(
     name="group_splitting_agent",
     model="gemini-2.5-flash",
     description="Advanced bill-splitting assistant for Google Wallet groups with comprehensive splitting options",

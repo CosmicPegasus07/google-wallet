@@ -1,7 +1,7 @@
 import json
 from typing import List, Dict
-from group_splitting_agent.tools.utils import round_to_cents, calculate_percentage
-from group_splitting_agent.tools.sql_execution import execute_query
+from chat_component.tools.utils import round_to_cents, calculate_percentage
+from chat_component.tools.sql_execution import execute_query
 
 
 def split_equal(total_amount: float, eligible_members: List[int]) -> Dict:
