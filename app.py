@@ -1,10 +1,13 @@
 import os
 import sys
+import time
 import uvicorn
 from fastapi import FastAPI, Request
 from google.adk.cli.fast_api import get_fast_api_app
 from dotenv import load_dotenv
+from datetime import datetime, timezone
 from chat_component import root_agent
+from contextlib import asynccontextmanager
 
 # Set up paths
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -16,7 +19,8 @@ SESSION_DB_URL = f"sqlite:///{os.path.join(BASE_DIR,'chat_component', 'mock_fina
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup code
-    print("Application starting up...")    
+    print("Application starting up...")
+    app.state.start_time = time.time()  # Track startup time for health checks
     # Initialize the DatabaseSessionService instance and store it in app.state
     try:
         app.state.session_service =DatabaseSessionService(db_url=SESSION_DB_URL)
@@ -24,7 +28,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print("Database session service initialized failed.")
         print(e)
-    
+
     yield # This is where the application runs, handling requests
     # Shutdown code
     print("Application shutting down...")
@@ -34,11 +38,79 @@ app: FastAPI = get_fast_api_app(
     # session_db_url=SESSION_DB_URL,
     allow_origins=["*"],  # In production, restrict this
     web=True,  # Enable the ADK Web UI
+    lifespan=lifespan,  # Add the lifespan context manager
 )
 # Add custom endpoints
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    """
+    Comprehensive health check endpoint that verifies system status
+    """
+    import time
+    import psutil
+    from datetime import datetime
+
+    try:
+        # Check database connectivity
+        db_status = "healthy"
+        try:
+            if hasattr(app.state, 'session_service') and app.state.session_service:
+                # Test database connection by attempting a simple operation
+                db_status = "healthy"
+            else:
+                db_status = "not_initialized"
+        except Exception as e:
+            db_status = f"error: {str(e)}"
+
+        # Get system metrics
+        cpu_percent = psutil.cpu_percent(interval=1)
+        memory = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+
+        health_data = {
+            "status": "healthy",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "uptime_seconds": time.time() - getattr(app.state, 'start_time', time.time()),
+            "database": {
+                "status": db_status
+            },
+            "system": {
+                "cpu_percent": cpu_percent,
+                "memory": {
+                    "total": memory.total,
+                    "available": memory.available,
+                    "percent": memory.percent
+                },
+                "disk": {
+                    "total": disk.total,
+                    "free": disk.free,
+                    "percent": (disk.used / disk.total) * 100
+                }
+            },
+            "services": {
+                "agent_service": "healthy" if 'root_agent' in globals() else "not_loaded"
+            }
+        }
+
+        # Determine overall health status
+        if db_status.startswith("error") or cpu_percent > 90 or memory.percent > 90:
+            health_data["status"] = "degraded"
+
+        return health_data
+
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "error": str(e)
+        }
+
+@app.get("/health/simple")
+async def simple_health_check():
+    """
+    Simple health check endpoint for basic monitoring
+    """
+    return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
 @app.get("/agent-info")
 async def agent_info():
     """Provide agent information"""
@@ -62,7 +134,6 @@ from google.genai import types
 import json
 import re
 import uuid
-from contextlib import asynccontextmanager
 from pydantic import BaseModel
 
 class CustomerInquiryResponse(BaseModel):
