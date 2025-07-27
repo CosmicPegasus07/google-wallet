@@ -5,6 +5,7 @@ uvicorn[standard]>=0.24.0
 # Google AI and ADK
 google-adk>=1.0.0
 google-generativeai>=0.3.0
+google-cloud-secret-manager>=2.16.0
 
 
 # Data Processing
@@ -28,6 +29,7 @@ flake8>=6.0.0
 
 # Security
 python-jose[cryptography]>=3.3.0  # if using JWT tokens
+PyJWT>=2.8.0  # JWT library
 passlib[bcrypt]>=1.7.4  # if using password hashing
 
 # HTTP Client (for external APIs)

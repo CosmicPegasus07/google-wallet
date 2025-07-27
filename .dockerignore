@@ -1,0 +1,21 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.git
+.gitignore
+*.json
+!requirements.txt
+.env
+.env.local
+*.log
+.pytest_cache/
+.coverage
+htmlcov/
+# Exclude IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.ps1
+

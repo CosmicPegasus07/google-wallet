@@ -9,6 +9,38 @@ from datetime import datetime, timezone
 from chat_component import root_agent
 from contextlib import asynccontextmanager
 
+def get_api_key_from_secret_manager():
+    """Get Google API key from Secret Manager with fallback to .env"""
+    # First try to load from .env file (for local development)
+    load_dotenv(os.path.join(os.path.dirname(__file__), 'chat_component', '.env'))
+    api_key = os.getenv("GOOGLE_API_KEY")
+
+    if api_key:
+        print("Using Google API key from .env file")
+        return api_key
+
+    # If not in .env, try Secret Manager (for production)
+    try:
+        from google.cloud import secretmanager
+
+        project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "gen-lang-client-0670800402")
+        secret_name = "google-api-key"
+
+        client = secretmanager.SecretManagerServiceClient()
+        name = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
+
+        response = client.access_secret_version(request={"name": name})
+        api_key = response.payload.data.decode("UTF-8")
+
+        # Set the environment variable for the ADK to use
+        os.environ["GOOGLE_API_KEY"] = api_key
+        print("Successfully loaded Google API key from Secret Manager")
+        return api_key
+    except Exception as e:
+        print(f"Failed to get API key from Secret Manager: {e}")
+        print("WARNING: No Google API key found. ADK agents may not work properly.")
+        return None
+
 # Set up paths
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 AGENT_DIR = BASE_DIR  # Parent directory containing multi_tool_agent
@@ -21,6 +53,10 @@ async def lifespan(app: FastAPI):
     # Startup code
     print("Application starting up...")
     app.state.start_time = time.time()  # Track startup time for health checks
+
+    # Initialize Google API key from Secret Manager
+    get_api_key_from_secret_manager()
+
     # Initialize the DatabaseSessionService instance and store it in app.state
     try:
         app.state.session_service =DatabaseSessionService(db_url=SESSION_DB_URL)
@@ -246,6 +282,6 @@ if __name__ == "__main__":
     uvicorn.run(
         app, 
         host="0.0.0.0", 
-        port=8000, 
+        port=8080, 
         reload=False
     )

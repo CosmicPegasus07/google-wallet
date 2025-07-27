@@ -14,22 +14,85 @@ import jwt
 import datetime
 
 # tool/google_wallet_tool.py
-# Load credentials from environment
+# Load credentials from environment or Secret Manager
 import os
 
-default_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'wallet-integration-466509-e4057ed46eeb.json'))
-GOOGLE_WALLET_SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_WALLET_SERVICE_ACCOUNT_FILE", default_path)
-GOOGLE_WALLET_ISSUER_ID = os.getenv("GOOGLE_WALLET_ISSUER_ID","3388000000022966378")
+def get_credentials_from_secret_manager():
+    """Get credentials from Google Secret Manager (for production)"""
+    try:
+        from google.cloud import secretmanager
+        import json
+
+        project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "gen-lang-client-0670800402")
+        secret_name = "google-wallet-service-account"
+
+        client = secretmanager.SecretManagerServiceClient()
+        name = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
+
+        response = client.access_secret_version(request={"name": name})
+        secret_value = response.payload.data.decode("UTF-8")
+
+        service_account_info = json.loads(secret_value)
+        return service_account.Credentials.from_service_account_info(
+            service_account_info, scopes=SCOPES
+        )
+    except Exception as e:
+        print(f"Failed to get credentials from Secret Manager: {e}")
+        return None
+
+# Get service account info from environment variables
+GOOGLE_WALLET_SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_WALLET_SERVICE_ACCOUNT_JSON")
+GOOGLE_WALLET_SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_WALLET_SERVICE_ACCOUNT_FILE")
+GOOGLE_WALLET_ISSUER_ID = os.getenv("GOOGLE_WALLET_ISSUER_ID", "3388000000022966378")
 
 # Set proper scopes
 SCOPES = ["https://www.googleapis.com/auth/wallet_object.issuer"]
 
-# Load credentials
-credentials = service_account.Credentials.from_service_account_file(
-    GOOGLE_WALLET_SERVICE_ACCOUNT_FILE, scopes=SCOPES
-)
+# Load credentials - try multiple methods (prioritize local development)
+credentials = None
+
+# Method 1: Development - try local file first (for local development)
+default_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'wallet-integration-466509-e4057ed46eeb.json'))
+if os.path.exists(default_path):
+    credentials = service_account.Credentials.from_service_account_file(
+        default_path, scopes=SCOPES
+    )
+    print("Using Google Wallet credentials from local file")
+
+if not credentials and GOOGLE_WALLET_SERVICE_ACCOUNT_FILE and os.path.exists(GOOGLE_WALLET_SERVICE_ACCOUNT_FILE):
+    # Method 2: Use file path from environment variable
+    credentials = service_account.Credentials.from_service_account_file(
+        GOOGLE_WALLET_SERVICE_ACCOUNT_FILE, scopes=SCOPES
+    )
+    print("Using Google Wallet credentials from environment file path")
+
+if not credentials and GOOGLE_WALLET_SERVICE_ACCOUNT_JSON:
+    # Method 3: Use JSON string from environment variable
+    import json
+    service_account_info = json.loads(GOOGLE_WALLET_SERVICE_ACCOUNT_JSON)
+    credentials = service_account.Credentials.from_service_account_info(
+        service_account_info, scopes=SCOPES
+    )
+    print("Using Google Wallet credentials from environment JSON")
+
+if not credentials:
+    # Method 4: Try Secret Manager (for production)
+    credentials = get_credentials_from_secret_manager()
+    if credentials:
+        print("Using Google Wallet credentials from Secret Manager")
+
+if not credentials:
+    print("WARNING: Google Wallet service account credentials not found. Google Wallet features will be disabled.")
+    print("To enable Google Wallet:")
+    print("1. Create secret: gcloud secrets create google-wallet-service-account --data-file=path/to/your/file.json")
+    print("2. Or set GOOGLE_WALLET_SERVICE_ACCOUNT_JSON environment variable")
+    print("3. Or set GOOGLE_WALLET_SERVICE_ACCOUNT_FILE environment variable")
+    # Don't raise an error, just continue without credentials
+
+# Initialize session and refresh credentials only if they exist
 session = requests.Session()
-credentials.refresh(Request())
+if credentials:
+    credentials.refresh(Request())
 
 class WalletRequest(BaseModel):
     user_id: str
@@ -37,11 +100,15 @@ class WalletRequest(BaseModel):
     transaction_amount: float
 
 def create_save_url_with_jwt(object_id: str):
+    if not credentials:
+        print("WARNING: Cannot create save URL - Google Wallet credentials not available")
+        return None
+
     claims = {
         'iss': credentials.service_account_email,
         'aud': 'google',
         'typ': 'savetowallet',
-        'iat': int(datetime.datetime.utcnow().timestamp()),
+        'iat': int(datetime.datetime.now(datetime.timezone.utc).timestamp()),
         'payload': {
             'genericObjects': [{
                 'id': object_id
@@ -60,8 +127,8 @@ def create_save_url_with_jwt(object_id: str):
 
 from google.adk.tools import ToolContext
 
-def create_google_wallet_pass(text_module_headers: List[str], text_module_bodies: List[str], 
-                              pass_type:str,pass_name:str, 
+def create_google_wallet_pass(text_module_headers: List[str], text_module_bodies: List[str],
+                              pass_type:str,pass_name:str,
                               short_description:str,
                               tool_context: ToolContext):
     """
@@ -80,6 +147,11 @@ def create_google_wallet_pass(text_module_headers: List[str], text_module_bodies
         dict: A fully structured payload conforming to the Google Wallet object specification.
     """
     print(tool_context)
+
+    # Check if credentials are available
+    if not credentials:
+        print("WARNING: Google Wallet credentials not available. Cannot create wallet pass.")
+        return {"error": "Google Wallet service not available", "Details": "Credentials not configured"}
     # image_bytes = base64.b64decode(image_base64)
     # output_file_path = "output_image.png"
     # try:
@@ -156,7 +228,10 @@ def create_google_wallet_pass(text_module_headers: List[str], text_module_bodies
  
 def create_google_wallet_pass_working(req: WalletRequest):
     try:
-        
+        # Check if credentials are available
+        if not credentials:
+            raise HTTPException(status_code=503, detail="Google Wallet service not available - credentials not configured")
+
         GENERIC_CLASS_ID = f"{GOOGLE_WALLET_ISSUER_ID}.receipt_class"  # Make sure this class exists in Google Wallet Console
 
         sanitized_user_id = req.user_id.replace('@', '_').replace('.', '_')

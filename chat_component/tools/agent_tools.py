@@ -658,7 +658,7 @@ def persist_expense_and_shares(group_id: int, payer_id: int, total_amount: float
 
     try:
         # Use a single connection for the entire transaction
-        db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'database', 'mock_finance.db')
+        db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'mock_finance.db')
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
