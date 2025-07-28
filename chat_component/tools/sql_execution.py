@@ -2,8 +2,7 @@
 import os
 import sqlite3
 
-# Get the base path for the database
-base_path = os.environ.get("DB_URL", '/Users/rakshithhr/Documents/projects/agentic_day/chat_module/chat_component')
+# Get the base path for the database from environment variable
 
 
 def execute_query(sql_query: str):
@@ -64,7 +63,9 @@ def execute_query_fetch(sql_query: str):
     Returns:
         Results fetched from database
     """
-    conn = sqlite3.connect(f'{base_path}/mock_finance.db')
+    db_path = os.path.join(os.path.dirname(__file__), '..', 'mock_finance.db')
+    db_path = os.path.abspath(db_path)  # Convert to absolute path
+    conn = sqlite3.connect(db_path)
     
     # Ensure the query always filters for USER_ID=10 for security
     sql_query_upper = sql_query.upper()

@@ -23,7 +23,7 @@ def get_group_info(group_name: str, user_id: int) -> str:
     try:
         # Find group by name that the user belongs to (case-insensitive)
         query = f"""
-            SELECT g.group_id, g.name, g.description, g.group_type, g.created_at
+            SELECT g.group_id, g.name, g.description, g.created_at
             FROM groups g
             JOIN user_groups ug ON g.group_id = ug.group_id
             WHERE LOWER(g.name) = LOWER('{group_name}') AND ug.user_id = {user_id}
@@ -51,8 +51,7 @@ def get_group_info(group_name: str, user_id: int) -> str:
             "group_id": group_id,
             "name": group_data[1],
             "description": group_data[2],
-            "group_type": group_data[3],
-            "created_at": group_data[4],
+            "created_at": group_data[3],
             "members": members
         }
 
@@ -404,7 +403,7 @@ def get_user_groups_info(user_id: int) -> str:
     """
     try:
         query = f"""
-            SELECT g.group_id, g.name, g.description, g.group_type,
+            SELECT g.group_id, g.name, g.description,
                     ug.role, g.created_at
             FROM groups g
             JOIN user_groups ug ON g.group_id = ug.group_id
@@ -419,9 +418,8 @@ def get_user_groups_info(user_id: int) -> str:
                 'group_id': row[0],
                 'name': row[1],
                 'description': row[2],
-                'group_type': row[3],
-                'role': row[4],
-                'created_at': row[5]
+                'role': row[3],
+                'created_at': row[4]
             })
 
         return json.dumps({"user_id": user_id, "groups": groups})

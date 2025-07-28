@@ -43,7 +43,7 @@ AnalysisAgent = LlmAgent(
 
 NeedCheckAgent = LlmAgent(
     name="NeedCheckAgent",
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
     description="Analyzes user purchase frequencies and suggests whether the user likely needs to buy an item again.",
     instruction=prompts['prompts']['Need_Check'],
     tools=[agent_tool.AgentTool(agent=InformationAgent) ]
@@ -51,14 +51,14 @@ NeedCheckAgent = LlmAgent(
 
 Receipt_Processor = LlmAgent(
     name="Receipt_Processor_Agent",
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
     description="Analyze the receipt and call the create_google_wallet_pass. Takes image input as well.",
     instruction=prompts['prompts']['Receipt_Processor'],
     tools=[create_google_wallet_pass]
 )
 Google_Search = LlmAgent(
     name="Google_Search_Agent",
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
     description="Searches google to retreive any external data",
     instruction="You are an Intelligent Agent with access to google search to find any inoformation required.",
     tools=[google_search]
